@@ -68,6 +68,7 @@ const MONGODB_URI = requireEnv("MONGODB_URI");
 const DB_NAME = process.env.MONGODB_DB || "eduvault";
 const DRY_RUN = process.env.DRY_RUN === "true";
 const REBUILD = process.argv.includes("--rebuild");
+const REPAIR = process.argv.includes("--repair");
 const REPAIR_SEARCH_INDEX = process.argv.includes("--repair-search-index");
 
 const PURCHASES = "purchases";

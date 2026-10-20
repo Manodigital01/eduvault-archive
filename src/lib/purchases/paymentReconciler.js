@@ -99,7 +99,8 @@ export async function reconcilePendingPurchases({
 
         summary.confirmed += 1;
         logger.info(
-          `Reconciled purchase ${purchase._id} for material ${purchase.materialId} — payment confirmed on-chain`
+          { purchaseId: String(purchase._id), materialId: purchase.materialId },
+          "Reconciled purchase — payment confirmed on-chain"
         );
       } else if (status === "failed") {
         const now = new Date();
@@ -109,7 +110,8 @@ export async function reconcilePendingPurchases({
         );
         summary.failed += 1;
         logger.warn(
-          `Purchase ${purchase._id} marked failed — transaction ${purchase.transactionHash} did not succeed on-chain`
+          { purchaseId: String(purchase._id), transactionHash: purchase.transactionHash },
+          "Purchase marked failed — transaction did not succeed on-chain"
         );
       } else {
         // 'pending' | 'not_found' — leave untouched for the next polling run.
@@ -117,9 +119,7 @@ export async function reconcilePendingPurchases({
       }
     } catch (err) {
       summary.errors += 1;
-      logger.error(
-        `Payment reconciliation failed for purchase ${purchase._id}: ${err?.message || err}`
-      );
+      logger.error({ purchaseId: String(purchase._id), err }, "Payment reconciliation failed for purchase");
     }
   }
 

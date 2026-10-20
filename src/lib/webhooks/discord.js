@@ -43,7 +43,7 @@ export async function sendDiscordWebhook(url, payload, retries = 3) {
     await validateWebhookDestination(url, { requireHttps: true });
   } catch (error) {
     if (error instanceof SsrfError) {
-      logger.error(`Discord webhook destination rejected by SSRF policy (${error.code})`);
+      logger.error({ code: error.code }, 'Discord webhook destination rejected by SSRF policy');
       return false;
     }
     throw error;
@@ -64,13 +64,13 @@ export async function sendDiscordWebhook(url, payload, retries = 3) {
         return true;
       }
 
-      logger.warn(`Discord webhook failed (Attempt ${attempt}/${retries}): ${response.status} ${response.statusText}`);
+      logger.warn({ attempt, retries, status: response.status, statusText: response.statusText }, 'Discord webhook failed');
     } catch (error) {
       if (error instanceof SsrfError) {
-        logger.error(`Discord webhook blocked by SSRF policy (${error.code})`);
+        logger.error({ code: error.code }, 'Discord webhook blocked by SSRF policy');
         return false;
       }
-      logger.error(`Discord webhook error (Attempt ${attempt}/${retries}): ${error.message}`);
+      logger.error({ attempt, retries, err: error }, 'Discord webhook error');
     }
 
     if (attempt < retries) {
@@ -79,6 +79,6 @@ export async function sendDiscordWebhook(url, payload, retries = 3) {
     }
   }
 
-  logger.error(`Discord webhook failed permanently after ${retries} attempts`);
+  logger.error({ retries }, 'Discord webhook failed permanently');
   return false;
 }
