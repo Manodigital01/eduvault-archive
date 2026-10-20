@@ -70,7 +70,7 @@ async function handle(req) {
       onConfirmed: async (purchase) => {
         // Reuse the synchronous path's side-effects: email receipt + creator webhook.
         sendReceiptIfEligible(db, purchase._id).catch((err) =>
-          logger.error(`Receipt send failed for purchase ${purchase._id}: ${err.message}`)
+          logger.error({ purchaseId: String(purchase._id), err }, "Receipt send failed")
         );
         broadcastPurchaseEvent(purchase.materialId, {
           buyerAddress: purchase.buyerAddress,
@@ -81,10 +81,10 @@ async function handle(req) {
       },
     });
 
-    logger.info(`Stellar payment reconciliation run complete: ${JSON.stringify(summary)}`);
+    logger.info({ summary }, "Stellar payment reconciliation run complete");
     return NextResponse.json({ ok: true, ...summary });
   } catch (err) {
-    logger.error(`Stellar payment reconciliation failed: ${err.message}`);
+    logger.error({ err }, "Stellar payment reconciliation failed");
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

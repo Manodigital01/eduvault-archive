@@ -75,6 +75,9 @@ export const CONFIG_CONTRACT = Object.freeze([
   // would let anyone forge unsubscribe links in production.
   { name: 'UNSUBSCRIBE_TOKEN_SECRET', kind: 'secret', requiredIn: ['production'] },
   { name: 'ANALYTICS_HASH_SECRET', kind: 'secret', requiredIn: [] },
+  // #883: keys log pseudonyms. Unset falls back to a random per-process key,
+  // which is safe but stops pseudonyms correlating across instances.
+  { name: 'LOG_HASH_SECRET', kind: 'secret', requiredIn: [] },
   { name: 'STELLAR_ADMIN_SECRET', kind: 'stellarSeed', requiredIn: [] },
   { name: 'STELLAR_ADMIN_PUBLIC_KEY', kind: 'stellarPublicKey', requiredIn: [] },
   { name: 'EDUVAULT_SANDBOX', kind: 'flag', requiredIn: [] },
@@ -88,6 +91,7 @@ const DISTINCT_SECRETS = Object.freeze([
   'CONTENT_MANIFEST_SECRET',
   'UNSUBSCRIBE_TOKEN_SECRET',
   'ANALYTICS_HASH_SECRET',
+  'LOG_HASH_SECRET',
   'STELLAR_WEBHOOK_SECRET',
 ]);
 

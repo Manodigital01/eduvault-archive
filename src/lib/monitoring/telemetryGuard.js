@@ -147,7 +147,7 @@ export function validateLabels(labels, allowedKeys = ALLOWED_LABEL_KEYS) {
 
 const FORBIDDEN_FIELD_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 const FIELD_KEY_PATTERN = /^[A-Za-z0-9_.$-]{1,64}$/;
-const CONTROL_CHARS = /[\u0000-\u001f\u007f  ]/g;
+const CONTROL_CHARS = /[\u0000-\u001f\u007f\u2028\u2029]/g;
 
 function isPlainObject(value) {
   if (value === null || typeof value !== "object") return false;
