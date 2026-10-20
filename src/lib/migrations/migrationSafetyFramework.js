@@ -57,7 +57,7 @@ export class SafeMigration {
     const db = await getDb();
     const collection = db.collection(this.targetCollection);
 
-    logger.info(`[Migration ${this.id}] Starting dry-run preview`);
+    logger.info({ migrationId: this.id }, '[Migration] Starting dry-run preview');
 
     // Find affected documents
     const query = await this.getAffectedQuery();
@@ -96,7 +96,7 @@ export class SafeMigration {
       estimatedDuration: this.estimateDuration(affectedCount),
     };
 
-    logger.info(`[Migration ${this.id}] Dry-run complete: ${affectedCount} records affected`);
+    logger.info({ migrationId: this.id, affectedCount }, '[Migration] Dry-run complete');
 
     return report;
   }
@@ -111,7 +111,7 @@ export class SafeMigration {
     const collection = db.collection(this.targetCollection);
     const batchSize = options.batchSize || 100;
 
-    logger.info(`[Migration ${this.id}] Starting execution`);
+    logger.info({ migrationId: this.id }, '[Migration] Starting execution');
 
     // Pre-flight validation
     const preValidation = await this.preValidate();
@@ -162,10 +162,10 @@ export class SafeMigration {
           _id: String(doc._id),
           error: error.message,
         });
-        logger.error(`[Migration ${this.id}] Failed to migrate document`, {
-          _id: doc._id,
-          error: error.message,
-        });
+        logger.error(
+          { migrationId: this.id, _id: doc._id, error: error.message },
+          '[Migration] Failed to migrate document'
+        );
 
         if (errors.length > 100) {
           // Too many errors, abort
@@ -196,11 +196,10 @@ export class SafeMigration {
       rollbackInfo: this.getRollbackProcedure(),
     };
 
-    logger.info(`[Migration ${this.id}] Execution complete`, {
-      processed: processedCount,
-      modified: modifiedCount,
-      failed: failedCount,
-    });
+    logger.info(
+      { migrationId: this.id, processed: processedCount, modified: modifiedCount, failed: failedCount },
+      '[Migration] Execution complete'
+    );
 
     return report;
   }

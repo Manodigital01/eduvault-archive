@@ -295,3 +295,86 @@ npx vitest run src/lib/monitoring
 deterministic sampling, count preservation, failure priority, recovery after
 abuse, field bounding, prototype-pollution keys, redaction ordering, the
 summary flush, and the rollback switch.
+
+## Log field protection (#883)
+
+The guard above protects telemetry *labels*. Issue #883 extends the same
+guarantees to every plain application log line. `src/lib/logger.js` installs
+[`src/lib/monitoring/logSafety.js`](../src/lib/monitoring/logSafety.js) as the
+pino `logMethod` hook, so all `logger.*` calls are protected centrally. The API
+request logger and `auditLog()` go through the same path.
+
+### Pipeline
+
+Each log call runs these steps in order:
+
+1. **Bound.** `boundFields()` caps keys, array length and depth, and strips
+   control characters.
+2. **Classify and transform.** Each field is classified by its key name (see
+   below).
+3. **Redact.** `redactSensitive()` masks secret keys and secret-shaped values.
+   It runs after pseudonymization. If it ran first, it would mask every 64-hex
+   tx hash to the same `[REDACTED]` and destroy correlation.
+4. **Correlate.** The ambient `correlationId` (from `runWithCorrelationId` /
+   the request headers) is added when the line doesn't already carry one.
+
+Message strings and interpolation arguments have identifier-shaped substrings
+pseudonymized. Errors are reduced to `{ type, code, message, stack }`, and the
+message and stack are masked the same way.
+
+### Field classes
+
+| Class | Keys (matched on camelCase/snake_case words) | Logged as |
+| --- | --- | --- |
+| identifier | any key containing `address`, `wallet`, `publicKey`, `email`, `phone`, `ip`, `userAgent`, `txHash`/`transactionHash`, `sourceAccount`; a bare role (`actor`, `user`, `buyer`, `creator`, `admin`, …); `<role>Id`/`<role>Ids`; `id`/`_id`/`sub` nested under an identifier key | `<kind>#<16 hex>` pseudonym, `kind` ∈ `stellar`, `evm`, `email`, `ip`, `id` |
+| locator | last word `url`, `uri`, `href`, `endpoint`, `referer`, `referrer` | origin + path; query, fragment and credentials dropped; id-shaped path segments → `:id` |
+| payload | last word `body`, `payload`, `query`, `search`, `q`, `headers`, `params`, `input`, `content`, `comment`, `notes` | `[omitted <type>:<size>]` |
+| default | everything else (`materialId`, `purchaseId`, `status`, `actorType`, …) | unchanged, except embedded wallets/emails/IPs are pseudonymized |
+
+Categories and internal resource ids deliberately stay readable. They are
+bounded per resource, carry no personal data, and are what operators use to
+find the record to repair.
+
+### Pseudonyms and debugging
+
+- Pseudonyms are `HMAC-SHA256(LOG_HASH_SECRET, normalizedValue)` truncated to
+  64 bits. Stellar strkeys are upper-cased and EVM addresses and emails are
+  lower-cased before hashing, so one wallet maps to one pseudonym in any
+  casing and under any field name.
+- A keyed HMAC is used rather than a plain hash. Wallet addresses are public
+  and enumerable, so an unkeyed hash could be reversed with a lookup table.
+- To find a known user's lines, compute their pseudonym with the same key:
+  `node -e "import('./src/lib/monitoring/logSafety.js').then(m => console.log(m.pseudonymize(process.argv[1])))" G...`
+  (run with the deployment's `LOG_HASH_SECRET`).
+- Prefer `correlationId` to follow a single request end to end.
+
+### Rules for contributors
+
+1. Log via `@/lib/logger` and pass values as structured fields with
+   descriptive keys. The key decides the protection.
+2. Keep log messages constant strings. ESLint's `no-restricted-syntax` (selectors
+   in `UNSAFE_LOG_SYNTAX`, `eslint.config.mjs`) rejects template literals with
+   expressions and `+` concatenation in `logger.*`/`log.*` calls.
+3. Never log raw request bodies, headers, full DB documents or signed XDR.
+4. Don't promote pseudonyms or other per-entity fields to log-backend labels.
+
+### Configuration and rollout
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `LOG_HASH_SECRET` | random per-process key | Set a unique ≥32-char value in staging/production so pseudonyms correlate across instances and restarts. It's in the config contract (`npm run config:contract`) and must differ from the other signing secrets. Rotating it changes all future pseudonyms. |
+
+No migration is needed: the change only affects newly emitted log lines.
+
+### Verification
+
+```bash
+npx tsx --test tests/backend/log-safety.test.mjs
+npx eslint src scripts
+```
+
+`log-safety.test.mjs` covers key classification, the unsafe examples (raw
+wallets, nested user ids, tx hashes, emails in error messages, URLs with
+tokens, raw payloads, secrets), pseudonym stability and key dependence, the
+real pino wiring, the lint selectors, and a scan of `src/` and `scripts/` for
+interpolated log messages.

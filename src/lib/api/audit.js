@@ -1,3 +1,5 @@
+import { maskIdentifiersInText } from "../monitoring/logSafety.js";
+
 const SAFE_FIELDS = new Set([
   "event",
   "route",
@@ -35,7 +37,8 @@ export function auditLog(fields) {
       stringValue = stringValue.replace(/(bearer\s+)[^\s]+/ig, '$1***');
       stringValue = stringValue.replace(/(token=)[^\s&]+/ig, '$1***');
       stringValue = stringValue.replace(/https?:\/\/[^\s]+/ig, '***');
-      entry[key] = stringValue.slice(0, 300);
+      // Wallets, emails and IPs become stable pseudonyms (#883).
+      entry[key] = maskIdentifiersInText(stringValue).slice(0, 300);
     }
   }
 

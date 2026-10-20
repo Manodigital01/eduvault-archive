@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { AppError } from "@/lib/errors/AppError.js";
+import { AppError } from "../errors/AppError.js";
 
 export const IDEMPOTENCY_KEY_HEADER = "idempotency-key";
 export const IDEMPOTENCY_KEY_FIELD = "idempotencyKey";

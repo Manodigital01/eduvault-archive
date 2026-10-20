@@ -57,6 +57,10 @@ export const COLLECTIONS = {
   // src/lib/approvals/maintainerApprovalFlow.js.
   maintainerApprovalIntents: "maintainer_approval_intents",
   maintainerApprovalReceipts: "maintainer_approval_receipts",
+  // #880: verified external identity links and their single-use challenges.
+  // See src/lib/auth/identityLinks.js.
+  identityLinks: "identity_links",
+  identityLinkChallenges: "identity_link_challenges",
 };
 
 export const REQUIRED_INDEXES = {
@@ -218,6 +222,8 @@ export const REQUIRED_INDEXES = {
     { keys: { status: 1, updatedAt: 1 } },
     { keys: { txHash: 1 }, options: { sparse: true } },
     { keys: { idempotencyKey: 1 }, options: { unique: true, sparse: true } },
+    // #882: resolves a user's refunds for their operation history.
+    { keys: { buyerAddress: 1 }, options: { name: "refunds_buyer_idx" } },
   ],
   refund_audit_log: [
     { keys: { refundId: 1, createdAt: 1 } },
@@ -228,6 +234,8 @@ export const REQUIRED_INDEXES = {
     { keys: { operationId: 1 }, options: { unique: true } },
     { keys: { action: 1, createdAt: -1 } },
     { keys: { "target.type": 1, "target.id": 1, sequence: 1 } },
+    // #882: per-user operation history (actor branch), newest-first by sequence.
+    { keys: { actor: 1, sequence: -1 }, options: { name: "audit_ledger_actor_sequence_idx" } },
   ],
   audit_checkpoints: [
     { keys: { sequence: 1 }, options: { unique: true } },
@@ -294,6 +302,20 @@ export const REQUIRED_INDEXES = {
     // One decided receipt per intent — a decision, once signed, is final.
     { keys: { intentId: 1 }, options: { unique: true, name: "maintainer_approval_intent_idx" } },
     { keys: { approverAddress: 1, signedAt: -1 }, options: { name: "maintainer_approval_approver_idx" } },
+  ],
+  identity_links: [
+    { keys: { linkId: 1 }, options: { unique: true, name: "identity_links_id_idx" } },
+    // An identity is linked to at most one account at a time; unlinked rows
+    // stay as history and free the slot for relinking.
+    {
+      keys: { provider: 1, subjectKey: 1 },
+      options: { unique: true, partialFilterExpression: { status: "linked" }, name: "identity_links_active_subject_idx" },
+    },
+    { keys: { userId: 1, status: 1, linkedAt: -1 }, options: { name: "identity_links_user_idx" } },
+  ],
+  identity_link_challenges: [
+    { keys: { challengeId: 1 }, options: { unique: true, name: "identity_link_challenges_id_idx" } },
+    { keys: { expiresAt: 1 }, options: { expireAfterSeconds: 0, name: "identity_link_challenges_expiry_idx" } },
   ],
 };
 
