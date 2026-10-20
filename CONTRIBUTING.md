@@ -85,6 +85,18 @@ npm run validate:e2e-purchase
 
 See [docs/e2e-purchase-flow-coverage.md](docs/e2e-purchase-flow-coverage.md) for detailed documentation of the test suite.
 
+### Rare Failure Fixtures
+
+To reproduce a rare failure state locally without crafting data by hand, load its deterministic fixture and follow its documented repair path:
+
+```bash
+node scripts/load-failure-fixtures.mjs --list                                 # catalog + repair paths
+node scripts/load-failure-fixtures.mjs stale-pending-purchase-paid-onchain --detect
+node scripts/load-failure-fixtures.mjs --unload                               # remove fixture rows only
+```
+
+When you change a schema or an integrity rule, run `npx tsx --test tests/backend/failure-fixtures.test.mjs`. It fails if a fixture no longer matches. See [docs/failure-fixtures.md](docs/failure-fixtures.md).
+
 ### Soroban Contract Setup
 
 If you are contributing to smart contracts, additional Rust tooling is required. See the [detailed Soroban setup instructions](docs/contributing.md#rust-and-soroban-prerequisites) in the full contribution guide.
@@ -113,6 +125,15 @@ The CI uses `wasm32v1-none` for builds, while the project `build.sh` script uses
 - Do not claim a feature is on Stellar unless it is implemented and testable in this repository.
 - Do not add new product work to the archived EVM prototype unless there is an explicit architecture decision to do so.
 - Update documentation when architecture or environment requirements change.
+
+### Logging Rules
+
+- Log through `@/lib/logger`. Every call is pseudonymized, URL-stripped and secret-redacted centrally, so do not hand-roll masking.
+- Keep messages constant: `logger.warn({ buyerAddress }, 'Address mismatch')`, never `` logger.warn(`Mismatch for ${buyerAddress}`) ``. ESLint (`no-restricted-syntax`) fails interpolated or concatenated log messages.
+- Name fields after what they hold (`buyerAddress`, `userId`, `url`, `body`). The key decides how a value is protected.
+- Never log raw request bodies, headers or full documents; log the specific fields you need.
+- Correlate with the request `correlationId` and internal resource ids (`materialId`, `purchaseId`), not with personal identifiers.
+- Full rules and field classes: [docs/OBSERVABILITY_TELEMETRY.md](docs/OBSERVABILITY_TELEMETRY.md#log-field-protection-883).
 
 ## Pull Request Checklist
 
