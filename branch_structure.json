@@ -1,0 +1,18 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "feat/issue-856-eduvault-implement-delegated-recovery-contacts",
+    "main",
+    "origin"
+  ],
+  "parent": {
+    "feat/issue-856-eduvault-implement-delegated-recovery-contacts": "main",
+    "main": null,
+    "origin": "main"
+  },
+  "order": [
+    "main",
+    "feat/issue-856-eduvault-implement-delegated-recovery-contacts",
+    "origin"
+  ]
+}
