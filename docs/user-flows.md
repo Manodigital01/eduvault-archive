@@ -49,11 +49,48 @@ Learners track their progress and bookmark states tied to the exact material ver
 - Material rollbacks query historical version bookmarks directly.
 - Learners can export their progress history via privacy export APIs.
 
+## Delegated recovery contacts (#account recovery)
+
+EduVault supports delegated account recovery without giving maintainers unchecked control over student-owned assets or records. Recovery is driven by trusted contacts the user invites and confirms.
+
+### Model
+
+- `RecoveryContact`: owner wallet, contact wallet, invitation status, confirmation timestamp, and revocation metadata.
+- `RecoveryRequest`: owner wallet, requesting contact, reason, status (`pending`, `approved`, `rejected`, `expired`, `revoked`), expiry timestamp, and approval count.
+- `RecoveryAuditEvent`: append-only record of every recovery action with actor wallet, action, reason, and timestamp.
+
+### Invitation and confirmation
+
+1. Owner invites a contact (`invite` in `pending` state).
+2. Contact accepts the invitation (`accept`) and the contact becomes `confirmed`.
+3. Contacts in `pending` or `revoked` state cannot act on recovery requests.
+4. Owner can revoke a contact at any time; revoked contacts cannot approve or reject requests.
+
+### Request flow
+
+1. A confirmed contact creates a recovery request with a reason and expiry window.
+2. Owner or other confirmed contacts approve or reject the request.
+3. Approvals from expired or revoked recovery contacts fail safely and do not count toward restoration.
+4. Requests past their expiry timestamp transition to `expired` and cannot be approved.
+5. Approved requests can be revoked by the owner before restoration completes.
+
+### Audit
+
+Every invite, accept, request, approve, reject, expire, and revoke action writes a `RecoveryAuditEvent` capturing the actor wallet, action, reason (when provided), and timestamp.
+
+### Verification
+
+Run the recovery test suite:
+
+```
+npm test -- tests/recovery
+```
+
+The suite covers invite, accept, request, approve, reject, expire, and revoke states, including that unconfirmed contacts cannot act and that expired/revoked approvals fail safely.
+
 ## Accessibility Flow (#712)
 
 Complex forms and error recovery screens are keyboard-navigable and announced correctly to assistive technology. This covers the Creator Upload form, the checkout recovery screen, and the material edit form.
-
-> Note: the accessibility component tests referenced below are authored as `.jsx` files and executed through the project's Jest/Babel pipeline (`npm test`). Do not run `node --check` directly against `.jsx` files; Node's built-in syntax checker does not understand the `.jsx` extension and will fail with `ERR_UNKNOWN_FILE_EXTENSION`. Use `npm test -- tests/accessibility` (or `npx jest tests/accessibility`) for syntax and behavior verification instead.
 
 > Note: the accessibility component tests referenced below are authored as `.jsx` files and executed through the project's Jest/Babel pipeline (`npm test`). Do not run `node --check` directly against `.jsx` files; Node's built-in syntax checker does not understand the `.jsx` extension and will fail with `ERR_UNKNOWN_FILE_EXTENSION`. Use `npm test -- tests/accessibility` (or `npx jest tests/accessibility`) for syntax and behavior verification instead.
 
@@ -94,5 +131,4 @@ Documented manual checks:
 2. Submit with an invalid price; confirm the error is announced and focus moves to the price field.
 3. Open the checkout recovery screen with a screen reader; confirm the pending attempt and cancel action are announced.
 4. Run `npm test -- tests/accessibility` and confirm all accessibility checks pass.
-5. Confirm the accessibility suite is executed via Jest (not `node --check`); `.jsx` files must be transformed by the project's Babel config before syntax validation.
 5. Confirm the accessibility suite is executed via Jest (not `node --check`); `.jsx` files must be transformed by the project's Babel config before syntax validation.

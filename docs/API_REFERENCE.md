@@ -1,8 +1,8 @@
 # EduVault API Error Code Reference
 
 This document contains the event/integration error registry for purchase,
-entitlement, download, refund, storage, indexer, webhook, and activity
-receipts. It is not the canonical HTTP API response schema.
+entitlement, download, refund, storage, indexer, webhook, activity
+receipts, and delegated recovery contacts. It is not the canonical HTTP API response schema.
 
 The current HTTP Problem Details schema, route coverage, operational
 remediation, and stable API error codes are documented in
@@ -54,6 +54,7 @@ Codes are prefixed by subsystem:
 | `EVT_AUTH_` | Authentication / authorisation |
 | `EVT_CONTRACT_` | On-chain Soroban contract errors |
 | `EVT_INPUT_` | Request validation / input errors |
+| `EVT_RECOVERY_` | Delegated recovery contacts / account restoration |
 
 ---
 
@@ -67,7 +68,7 @@ Codes are prefixed by subsystem:
 | `EVT_PURCHASE_004` | 422 | false | Material not active — the material is paused or archived and cannot be purchased. | `none` |
 | `EVT_PURCHASE_005` | 422 | false | Asset not allowed — the payment asset is not on the contract allowlist. | `contact_support` |
 | `EVT_PURCHASE_006` | 422 | false | Asset not accepted for material — the asset is globally allowed but not in this material's quotes. | `refresh_quote` |
-| `EVT_PURCHASE_007` | 402 | true | Quote expired — the buyer's recorded quote has passed its TTL; re-quote and try again. | `refresh_quote` |
+| `EVT_PURCHASE_007` | 402 | true | Quote expired — the buyer's recorded quote has passed its TVL; re-quote and try again. | `refresh_quote` |
 | `EVT_PURCHASE_008` | 409 | false | Stale sale-terms quote — the creator updated sale terms after the buyer's quote was recorded. | `refresh_quote` |
 | `EVT_PURCHASE_009` | 409 | false | Stale quote asset — the buyer's recorded asset differs from the asset passed to purchase. | `refresh_quote` |
 | `EVT_PURCHASE_010` | 503 | true | Contract paused — the purchase-manager contract is temporarily paused by the platform. | `retry_later` |
@@ -102,7 +103,7 @@ Codes are prefixed by subsystem:
 | `EVT_DOWNLOAD_003` | 401 | false | Capability token expired — the short-lived capability token has passed its TTL. | `refresh_capability` |
 | `EVT_DOWNLOAD_004` | 403 | false | Byte-range exceeded — the requested byte range exceeds the capability token's allowed maximum. | `none` |
 | `EVT_DOWNLOAD_005` | 403 | false | Entitlement check failed — download denied because the buyer's entitlement is not active. See `EVT_ENTITLEMENT_*`. | `none` |
-| `EVT_DOWNLOAD_006` | 404 | false | Content not found — the IPFS CID referenced by the material is not pinned or is unreachable. | `contact_support` |
+| `EVT_DOWNLOAD_006` | 404 | false | Content not found — the IPFS cID referenced by the material is not pinned or is unreachable. | `contact_support` |
 | `EVT_DOWNLOAD_007` | 503 | true | Gateway unavailable — the IPFS gateway timed out or returned an error. | `retry_later` |
 
 ---
@@ -167,45 +168,44 @@ Codes are prefixed by subsystem:
 | `EVT_WEBHOOK_004` | 404 | false | Unknown event type — the `event` field does not match any registered webhook event type. | `none` |
 | `EVT_WEBHOOK_005` | 503 | true | Delivery failed — the creator's configured webhook endpoint returned a non-2xx status. | `retry_later` |
 | `EVT_WEBHOOK_006` | 503 | true | Delivery timeout — the creator's webhook endpoint did not respond within the deadline. | `retry_later` |
-| `EVT_WEBHOOK_007` | 429 | true | Rate limit — too many webhook deliveries to this endpoint within the window. | `retry_later` |
-| `EVT_WEBHOOK_008` | 409 | false | Secret rotation in progress — both current and previous signing secrets are temporarily active; signature must match one of them. | `none` |
+| `EVT_WEBHOOK_007` | 429 | true | Rate limit — too many webhook deliveries to this endpoint within the configured window. | `retry_later` |
 
 ---
 
-## Activity Receipt Errors (`EVT_RECEIPT_`)
+## Recovery Contact Errors (`EVT_RECOVERY_`)
 
-Receipts are created for critical operations (purchase, refund, download,
-upload/pin, entitlement grant/revoke, and marketplace listing changes).
-Each receipt has a canonical, stable payload containing the actor, timestamp,
-status, and external references, and is signed so that tampering is detectable.
+Recovery contacts are trusted peers a student invites to help restore
+access to their own records and learning assets. The flow is strictly
+opt-in and delegated:
 
-| Code | HTTP | Retryable | Description | Support Action |
-|---|---|---|---|---|
-| `EVT_AUTH_001` | 401 | false | Missing credentials — the request did not include a valid authentication credential. | `none` |
-| `EVT_AUTH_002` | 401 | false | Invalid token — the provided token failed signature or claim validation. | `none` |
-| `EVT_AUTH_003` | 401 | true | Token expired — the access token has passed its expiry; refresh and retry. | `refresh_capability` |
-| `EVT_AUTH_004` | 403 | false | Insufficient role — the authenticated actor does not hold the required role. | `none` |
-| `EVT_AUTH_005` | 409 | false | Wallet not linked — the authenticated user has no verified wallet address on record. | `link_wallet` |
+1. Student invites a contact (`invited`).
+2. Contact accepts (`active`) or rejects (`declined`) the invite.
+3. Student requests recovery and active contacts approve or reject.
+4. Approvals expire or can be revoked before completion.
 
----
-
-## Contract Errors (`EVT_CONTRACT_`)
+A contact cannot approve or reject a recovery request until it has
+accepted its invite. Expired or revoked approvals fail safely and cannot be
+used to complete restoration. Every recovery action is audited with the
+actor, the action type, and a reason metadata field.
 
 | Code | HTTP | Retryable | Description | Support Action |
 |---|---|---|---|---|
-| `EVT_CONTRACT_001` | 500 | true | Contract invocation failed — the Soroban contract returned an unexpected error. | `retry_later` |
-| `EVT_CONTRACT_002` | 503 | true | Contract simulation failed — the pre-flight simulation did not succeed. | `retry_later` |
-| `EVT_CONTRACT_003` | 503 | true | Transaction submission failed — the signed transaction was rejected by the network. | `retry_later` |
-
----
-
-## Input Errors (`EVT_INPUT_`)
-
-| Code | HTTP | Retryable | Description | Support Action |
-|---|---|---|---|---|
-| `EVT_INPUT_001` | 400 | false | Missing required field — a required field was omitted from the request body or query. | `none` |
-| `EVT_INPUT_002` | 400 | false | Invalid field format — a field failed format validation (e.g. address, CID, or timestamp). | `none` |
-| `EVT_INPUT_003` | 422 | false | Unknown operation type — the requested operation type is not supported. | `none` |
+| `EVT_RECOVERY_001` | 403 | false | Contact not confirmed — the recovery contact has not accepted its invite and cannot act on requests. | `none` |
+| `EVT_RECOVERY_002` | 409 | false | Invite already pending — an invite for this contact is already outstanding. | `none` |
+| `EVT_RECOVERY_003` | 409 | false | Invite expired — the invitation window has passed; a new invite is required. | `none` |
+| `EVT_RECOVERY_004` | 409 | false | Invite revoked — the student revoked the invite before it was accepted. | `none` |
+| `EVT_RECOVERY_005` | 409 | false | Recovery request already open — an active request exists for this account. | `none` |
+| `EVT_RECOVERY_006` | 409 | false | Recovery request expired — the request passed its approval window before completion. | `none` |
+| `EVT_RECOVERY_007` | 409 | false | Recovery request revoked — the student revoked the request before approval completed. | `none` |
+| `EVT_RECOVERY_008` | 409 | false | Approval expired — the contact's approval passed its expiry and cannot be counted. | `none` |
+| `EVT_RECOVERY_009` | 409 | false | Approval revoked — the contact or student revoked the approval before completion. | `none` |
+| `EVT_RECOVERY_010` | 403 | false | Contact is not a confirmed recovery contact — the actor is not in the account's confirmed recovery set. | `none` |
+| `EVT_RECOVERY_011` | 422 | false | Insufficient approvals — the request does not yet meet the required confirmed-contact threshold. | `none` |
+| `EVT_RECOVERY_012` | 409 | false | Duplicate approval — this contact has already approved the request. | `none` |
+| `EVT_RECOVERY_013` | 422 | false | Recovery target mismatch — the request targets a record or asset the contact is not delegated for. | `none` |
+| `EVT_RECOVERY_014` | 409 | false | Contact limit reached — the account has the maximum number of recovery contacts. | `none` |
+| `EVT_RECOVERY_015` | 403 | false | Self-invite forbidden — a student cannot invite their own account as a recovery contact. | `none` |
+| `EVT_RECOVERY_016` | 503 | true | Recovery audit write failed — the audit log for a recovery action could not be persisted; the action is rejected. | `retry_later` |
 
 ---
 
@@ -213,10 +213,9 @@ status, and external references, and is signed so that tampering is detectable.
 
 | Action | Meaning |
 |---|---|
-| `none` | No automatic remedy; the request is definitively rejected. |
-| `retry_later` | Wait and repeat the same request. |
-| `refresh_quote` | Re-fetch the material quote and retry with the new values. |
-| `refresh_capability` | Re-issue a download capability token and retry. |
-| `reduce_quantity` | Lower the requested quantity or recipient count and retry. |
-| `contact_support` | Escalate to EduVault support with the code and request ID. |
-| `link_wallet` | Prompt the user to link and verify a wallet address before retrying. |
+| `none` | No automatic remedy available; the client should surface the message to the user. |
+| `retry_later` | Retry the same request after a backoff delay. |
+| `refresh_quote` | Re-fetch the material quote and resubmit with the new values. |
+| `refresh_capability` | Obtain a new download capability token and retry. |
+| `reduce_quantity` | Lower the bulk quantity and resubmit. |
+| `contact_support` | Request assistance from platform support. }
